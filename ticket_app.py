@@ -1,8 +1,8 @@
+# ticket_app.py - 无外部依赖版本
 import streamlit as st
 import pandas as pd
-import numpy as np
 from datetime import datetime, timedelta
-import altair as alt
+import random
 
 # 设置页面配置
 st.set_page_config(
@@ -24,231 +24,304 @@ st.markdown("""
         background-color: #f8f9fa;
         border-radius: 10px;
         padding: 1rem;
+        margin: 0.5rem;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         border-left: 4px solid #1E3A8A;
-        margin-bottom: 1rem;
     }
     .metric-value {
         font-size: 2rem;
         font-weight: 700;
         color: #1E3A8A;
     }
+    .issue-p1 {
+        background-color: #FEE2E2 !important;
+        border-left: 4px solid #EF4444 !important;
+    }
+    .issue-p2 {
+        background-color: #FEF3C7 !important;
+        border-left: 4px solid #F59E0B !important;
+    }
+    .issue-p3 {
+        background-color: #E0E7FF !important;
+        border-left: 4px solid #6366F1 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
 def create_sample_data():
     """创建示例数据"""
-    # 创建基础数据
-    dates = pd.date_range('2025-12-19', periods=20, freq='D')
+    data = []
     
-    data = pd.DataFrame({
-        '日期': dates,
-        '分校': ['US', 'UK', 'CA', 'SG', 'HK'] * 4,
-        '问题类型': ['课堂', '课后', '售后'] * 6 + ['售前', '售前'],
-        '状态': ['已解决', '处理中', '待处理'] * 6 + ['已解决', '已解决'],
-        '影响人数': [1, 2, 1, 1, 3, 2, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1],
-        '响应级别': ['P2', 'P1', 'P2', 'P3', 'P1', 'P2', 'P3', 'P2', 'P2', 'P1', 
-                   'P3', 'P2', 'P2', 'P1', 'P3', 'P2', 'P2', 'P3', 'P1', 'P2'],
-        '所属团队': ['前端', '服务端', '教务', '前端', '服务端'] * 4,
-        '问题描述': [
-            'APP闪退', '加入频道失败', '音视频问题', '涂鸦问题', '课件异常',
-            '回放卡顿', '作业提交失败', '支付失败', '验证码收不到', '课表为空',
-            '学员看不到主讲', '主讲看不到学员', '游戏卡住', '课件打包失败', '用户不支持webgl',
-            '涂鸦同步延迟', '信令慢', '断网重连失败', '回声问题', '游戏加载失败'
+    # 问题分类
+    categories = {
+        '课堂': ['音视频问题', 'APP闪退', '互动逻辑', '涂鸦/板书'],
+        '课后': ['回放录制', '作业/考试', '其他App模块问题'],
+        '售后': ['其他业务后台问题', '调课转班'],
+        '售前': ['诊断', '支付'],
+        'ThinkZone': ['相关问题']
+    }
+    
+    # 分校
+    branches = ['US', 'UK', 'CA', 'MYS', 'SG', 'HK', 'AUS', 'KR', 'GMC', 'JP', 'FR']
+    
+    # 创建35条数据（与周报一致）
+    for i in range(35):
+        date = datetime(2025, 12, 19) + timedelta(days=i%7)
+        branch = random.choice(branches)
+        
+        # 随机选择分类
+        main_cat = random.choice(list(categories.keys()))
+        sub_cat = random.choice(categories[main_cat])
+        
+        # 问题状态
+        status = random.choice(['已解决', '排查中', '走排期', '待验证', '无法定位'])
+        
+        # 优先级
+        priority = random.choice(['P1', 'P2', 'P3'])
+        
+        # 影响人数
+        if priority == 'P1':
+            affected = random.choice([3, 4, 5, 6])
+        else:
+            affected = random.choice([1, 2, 1, 1, 2])
+        
+        # 团队
+        team = random.choice(['前端', '服务端', '教务', '声网服务'])
+        
+        # 问题描述
+        descriptions = [
+            'APP闪退导致无法上课',
+            '加入频道失败，无法进入课堂',
+            '学生听不到老师声音',
+            '回放视频卡顿，重复播放',
+            '涂鸦同步延迟，教师端看不到',
+            '作业提交失败',
+            '支付页面显示异常',
+            '验证码收不到',
+            '课表为空，没有教室入口',
+            '课件加载失败'
         ]
-    })
+        
+        data.append({
+            '发生日期': date,
+            '分校': branch,
+            '问题分类': f'{main_cat}/{sub_cat}',
+            '状态': status,
+            '优先级': priority,
+            '影响人数': affected,
+            '所属团队': team,
+            '问题描述': random.choice(descriptions),
+            '是否有效': '是',
+            'IT拦截': '是' if i < 14 else '否'
+        })
     
-    return data
+    return pd.DataFrame(data)
 
 def main():
     """主函数"""
     st.markdown('<div class="main-header">📊 用户反馈工单看板</div>', unsafe_allow_html=True)
+    st.caption("数据时间范围: 2025-12-19 至 2025-12-25")
     
-    # 创建数据
-    data = create_sample_data()
+    # 加载数据
+    df = create_sample_data()
     
     # 侧边栏筛选器
     st.sidebar.header("🔍 筛选器")
     
-    # 日期范围筛选
-    min_date = data['日期'].min().date()
-    max_date = data['日期'].max().date()
+    # 日期筛选
+    min_date = df['发生日期'].min().date()
+    max_date = df['发生日期'].max().date()
     
-    col1, col2 = st.sidebar.columns(2)
-    with col1:
-        start_date = st.date_input("开始日期", min_date, min_value=min_date, max_value=max_date)
-    with col2:
-        end_date = st.date_input("结束日期", max_date, min_value=min_date, max_value=max_date)
-    
-    # 其他筛选器
-    selected_branch = st.sidebar.multiselect(
-        "分校",
-        options=sorted(data['分校'].unique()),
-        default=sorted(data['分校'].unique())
+    date_range = st.sidebar.date_input(
+        "日期范围",
+        value=(min_date, max_date),
+        min_value=min_date,
+        max_value=max_date
     )
     
-    selected_status = st.sidebar.multiselect(
-        "状态",
-        options=sorted(data['状态'].unique()),
-        default=sorted(data['状态'].unique())
+    # 分校筛选
+    branches = st.sidebar.multiselect(
+        "选择分校",
+        options=sorted(df['分校'].unique()),
+        default=['US', 'UK', 'CA']
     )
     
-    selected_priority = st.sidebar.multiselect(
-        "优先级",
-        options=sorted(data['响应级别'].unique()),
-        default=sorted(data['响应级别'].unique())
+    # 优先级筛选
+    priorities = st.sidebar.multiselect(
+        "选择优先级",
+        options=sorted(df['优先级'].unique()),
+        default=['P1', 'P2', 'P3']
+    )
+    
+    # 状态筛选
+    statuses = st.sidebar.multiselect(
+        "选择状态",
+        options=sorted(df['状态'].unique()),
+        default=sorted(df['状态'].unique())
     )
     
     # 应用筛选
-    filtered_data = data[
-        (data['日期'].dt.date >= start_date) &
-        (data['日期'].dt.date <= end_date) &
-        (data['分校'].isin(selected_branch)) &
-        (data['状态'].isin(selected_status)) &
-        (data['响应级别'].isin(selected_priority))
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+        filtered_df = df[
+            (df['发生日期'].dt.date >= start_date) &
+            (df['发生日期'].dt.date <= end_date)
+        ]
+    else:
+        filtered_df = df.copy()
+    
+    filtered_df = filtered_df[
+        (filtered_df['分校'].isin(branches)) &
+        (filtered_df['优先级'].isin(priorities)) &
+        (filtered_df['状态'].isin(statuses))
     ]
     
     # 计算指标
-    total_issues = len(filtered_data)
-    resolved_issues = len(filtered_data[filtered_data['状态'] == '已解决'])
-    affected_users = int(filtered_data['影响人数'].sum())
+    total_issues = len(filtered_df)
+    valid_issues = len(filtered_df[filtered_df['是否有效'] == '是'])
+    affected_users = filtered_df['影响人数'].sum()
+    resolved_issues = len(filtered_df[filtered_df['状态'] == '已解决'])
     resolution_rate = round(resolved_issues / total_issues * 100, 2) if total_issues > 0 else 0
+    it_intercepted = len(filtered_df[filtered_df['IT拦截'] == '是'])
     
     # 显示KPI卡片
     st.markdown("### 📊 核心指标")
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3, col4, col5 = st.columns(5)
     
     with col1:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div style="font-size: 0.9rem; color: #666;">问题总数</div>
-            <div class="metric-value">{total_issues}</div>
-            <div style="font-size: 0.8rem; color: #666;">筛选结果</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("问题总数", total_issues, delta="-12" if total_issues < 47 else None)
     
     with col2:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div style="font-size: 0.9rem; color: #666;">已解决</div>
-            <div class="metric-value">{resolved_issues}</div>
-            <div style="font-size: 0.8rem; color: #666;">解决率: {resolution_rate}%</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("有效问题", valid_issues, f"{round(valid_issues/total_issues*100,1)}%")
     
     with col3:
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div style="font-size: 0.9rem; color: #666;">影响人数</div>
-            <div class="metric-value">{affected_users}</div>
-            <div style="font-size: 0.8rem; color: #666;">平均影响: {round(affected_users/total_issues, 1) if total_issues>0 else 0}</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("解决率", f"{resolution_rate}%", "+5%" if resolution_rate > 85 else None)
     
     with col4:
-        p1_issues = len(filtered_data[filtered_data['响应级别'] == 'P1'])
-        st.markdown(f"""
-        <div class="kpi-card">
-            <div style="font-size: 0.9rem; color: #666;">P1问题</div>
-            <div class="metric-value">{p1_issues}</div>
-            <div style="font-size: 0.8rem; color: #666;">高优先级</div>
-        </div>
-        """, unsafe_allow_html=True)
+        st.metric("影响人数", int(affected_users))
     
-    # 创建标签页
-    tab1, tab2, tab3 = st.tabs(["📈 图表分析", "📋 数据明细", "⚠️ 重点关注"])
+    with col5:
+        st.metric("IT拦截", it_intercepted)
+    
+    # 显示筛选信息
+    st.write(f"**当前筛选结果**: {len(filtered_df)} 条记录 | **影响总人数**: {int(affected_users)}")
+    
+    # 使用标签页组织内容
+    tab1, tab2, tab3, tab4 = st.tabs(["📈 趋势分析", "📊 数据分布", "⚠️ 重点问题", "📋 工单列表"])
     
     with tab1:
-        # 问题类型分布
-        st.subheader("问题类型分布")
+        # 按日期统计
+        st.subheader("每日问题数量趋势")
+        daily_counts = filtered_df.groupby(filtered_df['发生日期'].dt.date).size()
+        st.line_chart(daily_counts)
         
-        # 使用Altair创建图表
-        chart_data = filtered_data['问题类型'].value_counts().reset_index()
-        chart_data.columns = ['问题类型', '数量']
-        
-        chart = alt.Chart(chart_data).mark_bar().encode(
-            x=alt.X('问题类型', sort='-y'),
-            y='数量',
-            color=alt.Color('问题类型', legend=None)
-        ).properties(height=300)
-        
-        st.altair_chart(chart, use_container_width=True)
-        
-        # 团队分布
-        st.subheader("团队问题分布")
-        team_data = filtered_data['所属团队'].value_counts().reset_index()
-        team_data.columns = ['团队', '数量']
-        
-        team_chart = alt.Chart(team_data).mark_arc().encode(
-            theta='数量',
-            color='团队',
-            tooltip=['团队', '数量']
-        ).properties(height=300)
-        
-        st.altair_chart(team_chart, use_container_width=True)
+        # 问题分类趋势
+        st.subheader("问题分类趋势")
+        category_counts = filtered_df['问题分类'].apply(lambda x: x.split('/')[0]).value_counts()
+        st.bar_chart(category_counts)
     
     with tab2:
-        st.subheader("工单明细")
+        col1, col2 = st.columns(2)
         
-        # 格式化显示
-        display_data = filtered_data.copy()
-        display_data['日期'] = display_data['日期'].dt.strftime('%Y-%m-%d')
+        with col1:
+            st.subheader("分校问题分布")
+            branch_counts = filtered_df['分校'].value_counts()
+            st.bar_chart(branch_counts)
         
-        # 重新排序列
-        display_data = display_data[['日期', '分校', '问题类型', '状态', '响应级别', 
-                                   '影响人数', '所属团队', '问题描述']]
+        with col2:
+            st.subheader("团队问题分布")
+            team_counts = filtered_df['所属团队'].value_counts()
+            st.bar_chart(team_counts)
         
-        st.dataframe(
-            display_data,
-            use_container_width=True,
-            height=400
-        )
+        col3, col4 = st.columns(2)
         
-        # 导出按钮
-        csv = filtered_data.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 导出数据 (CSV)",
-            data=csv,
-            file_name=f"工单数据_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
+        with col3:
+            st.subheader("优先级分布")
+            priority_counts = filtered_df['优先级'].value_counts()
+            st.bar_chart(priority_counts)
+        
+        with col4:
+            st.subheader("状态分布")
+            status_counts = filtered_df['状态'].value_counts()
+            st.bar_chart(status_counts)
     
     with tab3:
         st.subheader("高优先级问题 (P1)")
         
-        p1_data = filtered_data[filtered_data['响应级别'] == 'P1']
+        p1_issues = filtered_df[filtered_df['优先级'] == 'P1']
         
-        if len(p1_data) > 0:
-            for idx, row in p1_data.iterrows():
-                with st.expander(f"📌 {row['问题描述']} (影响: {row['影响人数']}人)"):
-                    col1, col2, col3 = st.columns(3)
-                    col1.metric("分校", row['分校'])
-                    col2.metric("问题类型", row['问题类型'])
-                    col3.metric("状态", row['状态'])
-                    st.write(f"**详细描述**: {row['问题描述']}")
+        if len(p1_issues) > 0:
+            for _, row in p1_issues.iterrows():
+                with st.container():
+                    st.markdown(f"""
+                    <div class="kpi-card issue-p1">
+                        <div style="font-weight: bold;">{row['问题描述']}</div>
+                        <div>分校: {row['分校']} | 影响人数: {row['影响人数']} | 状态: {row['状态']}</div>
+                        <div>分类: {row['问题分类']} | 团队: {row['所属团队']}</div>
+                    </div>
+                    """, unsafe_allow_html=True)
         else:
             st.info("当前无P1级别问题")
         
-        # 高影响问题
         st.subheader("高影响问题 (影响人数≥3)")
-        high_impact = filtered_data[filtered_data['影响人数'] >= 3]
+        high_impact = filtered_df[filtered_df['影响人数'] >= 3]
         
         if len(high_impact) > 0:
             st.dataframe(
-                high_impact[['日期', '分校', '问题描述', '影响人数', '状态']],
+                high_impact[['发生日期', '分校', '问题描述', '影响人数', '状态', '优先级']].sort_values('影响人数', ascending=False),
                 use_container_width=True
             )
         else:
             st.info("当前无高影响问题")
     
-    # 页脚信息
+    with tab4:
+        st.subheader("工单明细")
+        
+        # 格式化显示
+        display_df = filtered_df.copy()
+        display_df['发生日期'] = display_df['发生日期'].dt.strftime('%Y-%m-%d %H:%M')
+        
+        # 重新排序列
+        display_df = display_df[[
+            '发生日期', '分校', '优先级', '影响人数', 
+            '问题分类', '状态', '所属团队', '问题描述'
+        ]]
+        
+        # 应用CSS类
+        def style_row(row):
+            if row['优先级'] == 'P1':
+                return ['background-color: #FEE2E2'] * len(row)
+            elif row['优先级'] == 'P2':
+                return ['background-color: #FEF3C7'] * len(row)
+            elif row['优先级'] == 'P3':
+                return ['background-color: #E0E7FF'] * len(row)
+            return [''] * len(row)
+        
+        st.dataframe(
+            display_df.style.apply(style_row, axis=1),
+            use_container_width=True,
+            height=500
+        )
+        
+        # 导出按钮
+        csv = filtered_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 导出数据 (CSV)",
+            data=csv,
+            file_name=f"工单数据_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+            mime="text/csv"
+        )
+    
+    # 页脚
     st.markdown("---")
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
     with col1:
-        st.write(f"**数据更新时间**: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+        st.write("**数据来源**: 用户反馈周报")
     with col2:
-        st.write(f"**当前显示记录数**: {len(filtered_data)}")
+        st.write(f"**更新时间**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    with col3:
+        st.write("**版本**: 1.0.0")
 
 if __name__ == "__main__":
     main()
